@@ -1,68 +1,114 @@
+import re
 from pages.base_page import BasePage
 
 
 class CatalogPage(BasePage):
-
     URL = "https://mebelmart-saratov.ru/myagkaya_mebel_v_saratove/divanyi_v_saratove"
 
-    # catalog
     PRODUCT_CARD = ".product-card"
     PRODUCT_NAME = ".product-card__name"
     PRODUCT_PRICE = ".product-card__now_price"
-    BUY_BUTTON = ".product-card a.btn.btn-primary"
-    FAVORITE_BUTTON = ".favorite-icon"
-
-    # search
-    SEARCH_INPUT = ".searchInput"
-    SEARCH_BUTTON = "button.submit"
-
-    # filters
-    PRICE_FILTER_BLOCK = ".filter_values_range-slider"
-    MIN_PRICE_SLIDER = ".min-slider-handle"
-    MAX_PRICE_SLIDER = ".max-slider-handle"
-    APPLY_FILTER_BUTTON = "#filterLinkContainer"
-
-    # --------------------------------------
 
     def open_catalog(self):
         self.open(self.URL)
 
+    def open_catalog_with_price_filter(self, price_from: int, price_to: int):
+        filter_url = f"{self.URL}?filterRange=&price={price_from}-{price_to}"
+        self.open(filter_url)
+        self.page.wait_for_load_state("domcontentloaded")
+        self.page.wait_for_load_state("networkidle")
+
     def wait_for_catalog_loaded(self):
-        self.page.locator(self.PRODUCT_CARD).first.wait_for()
+        self.page.locator(self.PRODUCT_CARD).first.wait_for(timeout=15000)
 
-    # --------------------------------------
-    # products
-    # --------------------------------------
-
-    def get_product_cards(self):
-        return self.page.locator(self.PRODUCT_CARD)
+    def is_catalog_loaded(self):
+        return self.page.locator(self.PRODUCT_CARD).count() > 0
 
     def get_product_cards_count(self):
         return self.page.locator(self.PRODUCT_CARD).count()
 
-    def get_first_product_name(self):
-        return self.page.locator(self.PRODUCT_NAME).first.inner_text().strip()
+    def get_name_price_pairs(self, limit=15):
+        cards = self.page.locator(self.PRODUCT_CARD)
+        result = []
 
-    def get_first_product_price(self):
-        return self.page.locator(self.PRODUCT_PRICE).first.inner_text().strip()
+        for i in range(min(cards.count(), limit)):
+            card = cards.nth(i)
+            name = card.locator(self.PRODUCT_NAME).inner_text().strip()
+            raw_price = card.locator(self.PRODUCT_PRICE).inner_text().strip()
+            result.append((name, raw_price))
 
-    def click_first_buy_button(self):
-        self.page.locator(self.BUY_BUTTON).first.click()
+        return result
 
-    def click_first_favorite_button(self):
-        self.page.locator(self.FAVORITE_BUTTON).first.click()
+    @staticmethod
+    def _extract_actual_price(raw_price: str):
+        numbers = re.findall(r"\d[\d\s]*", raw_price)
+        if not numbers:
+            return None
+        return int(numbers[-1].replace(" ", ""))
 
-    # --------------------------------------
-    # search
-    # --------------------------------------
+    def find_products_by_name(self, target_name: str):
+        cards = self.page.locator(self.PRODUCT_CARD)
+        matches = []
 
-    def search_for_product(self, text):
-        self.fill(self.SEARCH_INPUT, text)
-        self.click(self.SEARCH_BUTTON)
+        for i in range(cards.count()):
+            card = cards.nth(i)
+            name = card.locator(self.PRODUCT_NAME).inner_text().strip()
 
-    # --------------------------------------
-    # filters
-    # --------------------------------------
+            if target_name.lower() in name.lower():
+                raw_price = card.locator(self.PRODUCT_PRICE).inner_text().strip()
+                actual_price = self._extract_actual_price(raw_price)
+                matches.append({
+                    "card": card,
+                    "name": name,
+                    "raw_price": raw_price,
+                    "actual_price": actual_price,
+                    "index": i,
+                })
 
-    def click_apply_filter(self):
-        self.page.locator(self.APPLY_FILTER_BUTTON).click()
+        return matches
+
+    def find_product_by_name_in_price_range(self, target_name: str, price_from: int, price_to: int):
+        matches = self.find_products_by_name(target_name)
+
+        for item in matches:
+            price = item["actual_price"]
+            if price is not None and price_from <= price <= price_to:
+                return item
+
+        return None
+
+    def highlight_product(self, product_item):
+        card = product_item["card"]
+
+        card.scroll_into_view_if_needed()
+        self.page.wait_for_timeout(1200)
+
+        card.evaluate(
+            """
+            el => {
+                el.style.outline = '5px solid red';
+                el.style.outlineOffset = '4px';
+                el.style.backgroundColor = '#fff3cd';
+            }
+            """
+        )
+
+        self.page.wait_for_timeout(2500)
+
+    def highlight_all_matching_products(self, target_name: str):
+        matches = self.find_products_by_name(target_name)
+
+        for item in matches:
+            try:
+                item["card"].evaluate(
+                    """
+                    el => {
+                        el.style.outline = '3px dashed orange';
+                        el.style.outlineOffset = '3px';
+                    }
+                    """
+                )
+            except Exception:
+                pass
+
+        return matches

@@ -1,72 +1,71 @@
 from behave import given, when, then
 from pages.catalog_page import CatalogPage
-import re
-import allure
-from behave import given, when, then
 
-
-TARGET_SOFA = "Диван Шенилл"
+PRICE_FROM = 10000
+PRICE_TO = 15000
+TARGET_SOFA = "Диван Кларити"
 
 
 @given("open sofas catalog")
 def step_open_catalog(context):
-
     print("\n[STEP] Opening sofas catalog")
 
     context.catalog = CatalogPage(context.page)
-
     context.catalog.open_catalog()
     context.catalog.wait_for_catalog_loaded()
 
-    print("[OK] Catalog loaded")
+    assert context.catalog.is_catalog_loaded(), "Sofas catalog page did not load"
+
+    count = context.catalog.get_product_cards_count()
+    print(f"[OK] Catalog loaded. Cards found: {count}")
+
+    context.page.wait_for_timeout(2000)
 
 
 @when("apply price filter")
 def step_apply_filter(context):
+    print(f"\n[STEP] Applying GET filter {PRICE_FROM}-{PRICE_TO}")
 
-    print("\n[STEP] Applying price filter 10000-15000")
+    context.catalog.open_catalog_with_price_filter(PRICE_FROM, PRICE_TO)
+    context.catalog.wait_for_catalog_loaded()
 
-    context.catalog.click_apply_filter()
+    print("[INFO] First products after filter:")
+    for i, (name, price) in enumerate(context.catalog.get_name_price_pairs(limit=15), start=1):
+        print(f"  {i}. {name} — {price}")
 
     context.page.wait_for_timeout(2000)
-
-    print("[OK] Filter applied")
+    print("[OK] GET filter applied")
 
 
 @then("sofa with name should appear in results")
 def step_check_sofa(context):
-
     print(f"\n[STEP] Searching for sofa: {TARGET_SOFA}")
 
-    cards = context.page.locator(".product-card")
+    all_matches = context.catalog.highlight_all_matching_products(TARGET_SOFA)
+    print(f"[INFO] Total matches for '{TARGET_SOFA}': {len(all_matches)}")
 
-    found = False
+    for idx, item in enumerate(all_matches, start=1):
+        print(f"  {idx}. {item['name']} — {item['raw_price']} -> actual: {item['actual_price']}")
 
-    for i in range(cards.count()):
+    product = context.catalog.find_product_by_name_in_price_range(
+        TARGET_SOFA,
+        PRICE_FROM,
+        PRICE_TO
+    )
 
-        card = cards.nth(i)
+    assert product is not None, (
+        f"No '{TARGET_SOFA}' sofa was found with price in range {PRICE_FROM}-{PRICE_TO}"
+    )
 
-        name = card.locator(".product-card__name").inner_text().strip()
+    context.catalog.highlight_product(product)
 
-        if TARGET_SOFA in name:
+    print(f"[INFO] Found sofa: {product['name']}")
+    print(f"[INFO] Actual price: {product['actual_price']}")
 
-            price_text = card.locator(".product-card__now_price").inner_text()
+    assert PRICE_FROM <= product["actual_price"] <= PRICE_TO, (
+        f"Price {product['actual_price']} is not in filter range {PRICE_FROM}-{PRICE_TO}"
+    )
 
-            numbers = re.findall(r"\d+", price_text)
+    print(f"[SUCCESS] {product['name']} found and price is within filter range")
 
-            if len(numbers) >= 2:
-                price = int(numbers[-2] + numbers[-1])
-            else:
-                price = int(numbers[0])
-
-            print(f"Found sofa: {name}")
-            print(f"Price: {price}")
-
-            assert 10000 <= price <= 15000, f"Price {price} not in filter range"
-
-            found = True
-            break
-
-    assert found, f"{TARGET_SOFA} not found in filtered results"
-
-    print(f"[SUCCESS] {TARGET_SOFA} found and price is within filter range")
+    context.page.wait_for_timeout(3000)
