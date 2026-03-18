@@ -8,6 +8,7 @@ class CatalogPage(BasePage):
     PRODUCT_CARD = ".product-card"
     PRODUCT_NAME = ".product-card__name"
     PRODUCT_PRICE = ".product-card__now_price"
+    PRODUCT_OPEN_BUTTON = "a.btn.btn-primary"
 
     def open_catalog(self):
         self.open(self.URL)
@@ -76,6 +77,46 @@ class CatalogPage(BasePage):
                 return item
 
         return None
+
+    def get_product_card_by_name(self, target_name: str):
+        matches = self.find_products_by_name(target_name)
+
+        if not matches:
+            raise AssertionError(f"Товар с названием '{target_name}' не найден")
+
+        return matches[0]["card"]
+
+    def get_product_name_from_catalog(self, target_name: str):
+        matches = self.find_products_by_name(target_name)
+
+        if not matches:
+            raise AssertionError(f"Товар с названием '{target_name}' не найден")
+
+        return matches[0]["name"]
+
+    def open_product_by_name(self, target_name: str):
+        card = self.get_product_card_by_name(target_name)
+        card.scroll_into_view_if_needed()
+        card.locator(self.PRODUCT_OPEN_BUTTON).click()
+        self.page.wait_for_load_state("domcontentloaded")
+        self.page.wait_for_load_state("networkidle")
+
+    def get_catalog_card_dimensions(self, target_name: str):
+        card = self.get_product_card_by_name(target_name)
+        card_text = card.inner_text()
+
+        dimensions = {}
+
+        width_match = re.search(r"Ширина:\s*(\d+)\s*мм", card_text, re.IGNORECASE)
+        depth_match = re.search(r"Глубина:\s*(\d+)\s*мм", card_text, re.IGNORECASE)
+
+        if width_match:
+            dimensions["Ширина"] = width_match.group(1)
+
+        if depth_match:
+            dimensions["Глубина"] = depth_match.group(1)
+
+        return dimensions
 
     def highlight_product(self, product_item):
         card = product_item["card"]
