@@ -22,14 +22,22 @@ def before_scenario(context, scenario):
     context.scenario = scenario
     context.logger = logging.getLogger(f"behave.{scenario.name}")
 
-    is_ci = os.getenv("CI", "").lower() == "true"
+    headless_value = context.config.userdata.get("headless", "").lower()
+
+    if headless_value in ("true", "1", "yes"):
+        is_headless = True
+    elif headless_value in ("false", "0", "no"):
+        is_headless = False
+    else:
+        is_ci = os.getenv("CI", "").lower() == "true"
+        is_headless = is_ci
 
     context.logger.info("Starting scenario: %s", scenario.name)
-    context.logger.info("CI mode: %s", is_ci)
+    context.logger.info("Headless mode: %s", is_headless)
 
     context.browser = context.playwright.chromium.launch(
-        headless=is_ci,
-        slow_mo=0 if is_ci else 800
+        headless=is_headless,
+        slow_mo=0 if is_headless else 800
     )
     context.page = context.browser.new_page()
 
