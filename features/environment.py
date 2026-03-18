@@ -1,21 +1,39 @@
 from playwright.sync_api import sync_playwright
 import os
+import sys
+import logging
 
 
 def before_all(context):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+
+    context.logger = logging.getLogger("behave")
+    context.logger.info("Starting Playwright")
+
     context.playwright = sync_playwright().start()
 
 
 def before_scenario(context, scenario):
     context.scenario = scenario
+    context.logger = logging.getLogger(f"behave.{scenario.name}")
 
     is_ci = os.getenv("CI", "").lower() == "true"
+
+    context.logger.info("Starting scenario: %s", scenario.name)
+    context.logger.info("CI mode: %s", is_ci)
 
     context.browser = context.playwright.chromium.launch(
         headless=is_ci,
         slow_mo=0 if is_ci else 800
     )
     context.page = context.browser.new_page()
+
+    context.logger.info("Browser launched")
 
 
 def after_step(context, step):
@@ -28,6 +46,9 @@ def after_step(context, step):
         filename = f"{scenario_name}__{step_name}"
 
         error_text = str(step.exception) if step.exception else "Step failed"
+
+        context.logger.error("Step failed: %s", step.name)
+        context.logger.error("Error: %s", error_text)
 
         try:
             context.page.evaluate(
@@ -51,40 +72,48 @@ def after_step(context, step):
                 """,
                 error_text
             )
-        except Exception:
-            pass
+        except Exception as e:
+            context.logger.warning("Could not draw error overlay: %s", e)
 
         try:
             context.page.locator(".product-card").first.evaluate(
                 "el => el.style.border='5px solid red'"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            context.logger.warning("Could not highlight first product card: %s", e)
 
         try:
+            screenshot_path = f"screenshots/{filename}.png"
             context.page.screenshot(
-                path=f"screenshots/{filename}.png",
+                path=screenshot_path,
                 full_page=True
             )
-        except Exception:
-            pass
+            context.logger.info("Screenshot saved: %s", screenshot_path)
+        except Exception as e:
+            context.logger.warning("Could not save screenshot: %s", e)
 
         try:
+            html_path = f"page_source/{filename}.html"
             html = context.page.content()
-            with open(f"page_source/{filename}.html", "w", encoding="utf-8") as f:
+            with open(html_path, "w", encoding="utf-8") as f:
                 f.write(html)
-        except Exception:
-            pass
+            context.logger.info("Page source saved: %s", html_path)
+        except Exception as e:
+            context.logger.warning("Could not save page source: %s", e)
 
 
 def after_scenario(context, scenario):
     if scenario.status == "failed":
+        context.logger.error("Scenario failed: %s", scenario.name)
         print("Test failed — browser left open for debugging")
     else:
+        context.logger.info("Scenario passed: %s", scenario.name)
         if hasattr(context, "browser") and context.browser:
             context.browser.close()
+            context.logger.info("Browser closed")
 
 
 def after_all(context):
     if hasattr(context, "playwright") and context.playwright:
         context.playwright.stop()
+        logging.getLogger("behave").info("Playwright stopped")
