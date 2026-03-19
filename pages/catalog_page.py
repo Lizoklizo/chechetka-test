@@ -9,6 +9,7 @@ class CatalogPage(BasePage):
     PRODUCT_NAME = ".product-card__name"
     PRODUCT_PRICE = ".product-card__now_price"
     PRODUCT_OPEN_BUTTON = "a.btn.btn-primary"
+    FAVORITE_BUTTON = ".favorite-icon"
 
     def open_catalog(self):
         self.open(self.URL)
@@ -118,6 +119,19 @@ class CatalogPage(BasePage):
 
         return dimensions
 
+    def get_first_product_card(self):
+        return self.page.locator(self.PRODUCT_CARD).first
+
+    def get_first_product_name(self):
+        card = self.get_first_product_card()
+        return card.locator(self.PRODUCT_NAME).inner_text().strip()
+
+    def add_first_product_to_favorites(self):
+        card = self.get_first_product_card()
+        card.scroll_into_view_if_needed()
+        card.locator(self.FAVORITE_BUTTON).first.click()
+        self.page.wait_for_timeout(1500)
+
     def highlight_product(self, product_item):
         card = product_item["card"]
 
@@ -153,3 +167,17 @@ class CatalogPage(BasePage):
                 pass
 
         return matches
+
+    def get_first_product_link(self):
+        card = self.get_first_product_card()
+        return card.locator(self.PRODUCT_OPEN_BUTTON).first.get_attribute("href")
+
+    def get_first_product_keyword(self):
+        full_name = self.get_first_product_name()
+        words = full_name.split()
+
+        if len(words) > 1:
+            return words[-1].strip()
+
+        return full_name.strip()
+
