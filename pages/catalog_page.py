@@ -1,5 +1,6 @@
 import re
 from pages.base_page import BasePage
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
 class CatalogPage(BasePage):
@@ -15,8 +16,13 @@ class CatalogPage(BasePage):
     ADD_TO_CART_BUTTON = ".btnToCart"
     CART_LINK = '.header-laptop__cart a[href="/cart"].d-flex'
 
+    # def open_catalog(self):
+    #     self.open(self.URL)
+
     def open_catalog(self):
         self.open(self.URL)
+        self.page.wait_for_load_state("domcontentloaded")
+        self.page.wait_for_load_state("networkidle")
 
     def open_catalog_with_price_filter(self, price_from: int, price_to: int):
         filter_url = f"{self.URL}?filterRange=&price={price_from}-{price_to}"
@@ -24,8 +30,24 @@ class CatalogPage(BasePage):
         self.page.wait_for_load_state("domcontentloaded")
         self.page.wait_for_load_state("networkidle")
 
-    def wait_for_catalog_loaded(self):
-        self.page.locator(self.PRODUCT_CARD).first.wait_for(timeout=15000)
+    # def wait_for_catalog_loaded(self):
+    #     self.page.locator(self.PRODUCT_CARD).first.wait_for(timeout=15000)
+
+    def wait_for_catalog_loaded(self, timeout: int = 30000):
+        self.page.wait_for_load_state("domcontentloaded")
+
+        try:
+            self.page.locator(self.PRODUCT_CARD).first.wait_for(
+                state="visible",
+                timeout=timeout
+            )
+        except PlaywrightTimeoutError:
+            self.page.reload(wait_until="domcontentloaded")
+            self.page.wait_for_load_state("networkidle")
+            self.page.locator(self.PRODUCT_CARD).first.wait_for(
+                state="visible",
+                timeout=timeout
+            )
 
     def is_catalog_loaded(self):
         return self.page.locator(self.PRODUCT_CARD).count() > 0
