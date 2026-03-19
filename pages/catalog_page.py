@@ -12,6 +12,8 @@ class CatalogPage(BasePage):
     FAVORITE_BUTTON = ".favorite-icon"
     SEARCH_INPUT = ".searchInput"
     SEARCH_BUTTON = "button.submit"
+    ADD_TO_CART_BUTTON = ".btnToCart"
+    CART_LINK = '.header-laptop__cart a[href="/cart"].d-flex'
 
     def open_catalog(self):
         self.open(self.URL)
@@ -188,3 +190,47 @@ class CatalogPage(BasePage):
                 pass
 
         return matches
+
+
+    def get_product_card_by_index(self, index: int):
+        cards = self.page.locator(self.PRODUCT_CARD)
+        count = cards.count()
+
+        if count <= index:
+            raise AssertionError(
+                f"Найдено только {count} товаров, индекс {index} недоступен"
+            )
+
+        return cards.nth(index)
+
+    def get_product_name_by_index(self, index: int):
+        card = self.get_product_card_by_index(index)
+        return card.locator(self.PRODUCT_NAME).inner_text().strip()
+
+    def get_product_price_by_index(self, index: int):
+        card = self.get_product_card_by_index(index)
+        return card.locator(self.PRODUCT_PRICE).inner_text().strip()
+
+    def get_product_price_value_by_index(self, index: int):
+        raw_price = self.get_product_price_by_index(index)
+        actual_price = self._extract_actual_price(raw_price)
+
+        if actual_price is None:
+            raise AssertionError(f"Не удалось получить цену товара: {raw_price}")
+
+        return actual_price
+
+    def open_product_by_index(self, index: int):
+        card = self.get_product_card_by_index(index)
+        card.scroll_into_view_if_needed()
+        card.locator(self.PRODUCT_OPEN_BUTTON).first.click()
+        self.page.wait_for_load_state("domcontentloaded")
+        self.page.wait_for_load_state("networkidle")
+
+    def open_cart(self):
+        cart_link = self.page.locator(self.CART_LINK).last
+        cart_link.wait_for(state="visible", timeout=10000)
+        cart_link.click()
+
+        self.page.wait_for_load_state("domcontentloaded")
+        self.page.wait_for_load_state("networkidle")

@@ -2,40 +2,23 @@ from pages.base_page import BasePage
 
 
 class ProductPage(BasePage):
+    ADD_TO_CART_BUTTON = ".btnToCart:visible"
     PRODUCT_TITLE = "h1"
-    CHARACTERISTICS_TAB = "text=Характеристики"
-    CHARACTERISTICS_TABLE_ROWS = "table tr"
-
-    def wait_for_product_loaded(self):
-        self.page.locator(self.PRODUCT_TITLE).first.wait_for(timeout=15000)
-
-    def get_product_title(self):
-        return self.page.locator(self.PRODUCT_TITLE).first.inner_text().strip()
 
     def is_product_page(self):
         return self.page.locator(self.PRODUCT_TITLE).count() > 0
 
-    def open_characteristics_tab(self):
-        self.page.locator(self.CHARACTERISTICS_TAB).first.click()
-        self.page.wait_for_timeout(1000)
+    def get_product_title(self):
+        return self.page.locator(self.PRODUCT_TITLE).first.inner_text().strip()
 
-    def get_characteristic_value(self, characteristic_name: str):
-        rows = self.page.locator(self.CHARACTERISTICS_TABLE_ROWS)
-        count = rows.count()
+    def click_add_to_cart_and_dismiss_dialog(self):
+        self.page.wait_for_load_state("domcontentloaded")
+        self.page.wait_for_timeout(1500)
 
-        for i in range(count):
-            row = rows.nth(i)
-            cells = row.locator("td")
+        self.page.once("dialog", lambda dialog: dialog.dismiss())
 
-            if cells.count() < 2:
-                continue
+        button = self.page.locator(self.ADD_TO_CART_BUTTON).first
+        button.wait_for(state="visible", timeout=15000)
+        button.click()
 
-            key = cells.nth(0).inner_text().strip().lower()
-            value = cells.nth(1).inner_text().strip()
-
-            normalized_key = key.replace(",", "").replace(".", "").strip()
-
-            if characteristic_name.lower() in normalized_key:
-                return value
-
-        return None
+        self.page.wait_for_timeout(1500)
