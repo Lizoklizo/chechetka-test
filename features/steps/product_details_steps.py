@@ -9,10 +9,8 @@ logger = logging.getLogger(__name__)
 def step_open_sofa_card(context, sofa_name):
     logger.info("Opening sofa card by name: %s", sofa_name)
 
-    context.catalog_name = context.catalog_page.get_product_name_from_catalog(sofa_name)
     context.catalog_dimensions = context.catalog_page.get_catalog_card_dimensions(sofa_name)
 
-    logger.info("Catalog product name: %s", context.catalog_name)
     logger.info("Catalog dimensions: %s", context.catalog_dimensions)
 
     assert "Ширина" in context.catalog_dimensions, (

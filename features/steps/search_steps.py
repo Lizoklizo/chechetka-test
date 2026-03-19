@@ -33,10 +33,8 @@ def step_check_search_results_loaded(context):
 @then('first search result should contain "{expected_text}"')
 def step_check_first_search_result(context, expected_text):
     first_name = context.search_page.get_first_product_name()
-    all_names = context.search_page.get_product_names()
 
-    logger.info("First result: %s", first_name)
-    logger.info("All results: %s", all_names)
+    logger.info("Result: %s", first_name)
 
     assert first_name is not None, "No products found in search results"
     assert expected_text.lower() in first_name.lower(), (
