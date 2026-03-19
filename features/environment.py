@@ -110,9 +110,20 @@ def after_step(context, step):
             context.logger.warning("Could not save page source: %s", e)
 
 
+# def after_scenario(context, scenario):
+#     if scenario.status == "failed":
+#         context.logger.error("Scenario failed: %s", scenario.name)
+#         print("Test failed — browser left open for debugging")
+#     else:
+#         context.logger.info("Scenario passed: %s", scenario.name)
+#         if hasattr(context, "browser") and context.browser:
+#             context.browser.close()
+#             context.logger.info("Browser closed")
+
+
 def after_scenario(context, scenario):
-    if scenario.status == "failed":
-        context.logger.error("Scenario failed: %s", scenario.name)
+    if scenario.status != "passed":
+        context.logger.error("Scenario finished with status '%s': %s", scenario.status, scenario.name)
         print("Test failed — browser left open for debugging")
     else:
         context.logger.info("Scenario passed: %s", scenario.name)
